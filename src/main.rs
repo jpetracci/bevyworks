@@ -10,15 +10,18 @@ fn main() {
 
 fn setup(
     commands: &mut Commands,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    materials: ResMut<Assets<ColorMaterial>>,
     _asset_server: Res<AssetServer>,
 ) {
-    commands
-        .spawn(Camera2dBundle::default())
-        .spawn(SpriteBundle {
-            material: materials.add(Color::RED.into()),
-            transform: Transform::default(),
-            sprite: Sprite::new(Vec2::new(10.0, 10.0)),
-            ..Default::default()
-        });
+    commands.spawn(Camera2dBundle::default());
+    blast_off(commands, materials);
+}
+
+fn blast_off(commands: &mut Commands, mut materials: ResMut<Assets<ColorMaterial>>) {
+    commands.spawn(SpriteBundle {
+        material: materials.add(Color::RED.into()),
+        transform: Transform::from_translation(Vec3::new(0.0, -200.0, 0.0)),
+        sprite: Sprite::new(Vec2::new(10.0, 10.0)),
+        ..Default::default()
+    });
 }
