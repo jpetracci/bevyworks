@@ -1,10 +1,10 @@
 use bevy::{prelude::*, render::pass::ClearColor};
 use rand::Rng;
-use std::time::Duration;
 
 fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
+        .add_resource(FireworkTimer(Timer::from_seconds(1.0, true)))
         .add_resource(ClearColor(Color::rgb(0.1, 0.1, 0.1)))
         .add_startup_system(setup.system())
         .add_system(firework_propellant.system())
@@ -21,11 +21,6 @@ struct Materials {
 }
 
 struct FireworkTimer(Timer);
-impl Default for FireworkTimer {
-    fn default() -> Self {
-        Self(Timer::new(Duration::from_secs(1), true))
-    }
-}
 
 fn setup(
     commands: &mut Commands,
@@ -87,7 +82,7 @@ fn launcher(
     commands: &mut Commands,
     materials: Res<Materials>,
     time: Res<Time>,
-    mut timer: Local<FireworkTimer>,
+    mut timer: ResMut<FireworkTimer>,
 ) {
     if timer.0.tick(time.delta_seconds()).finished() {
         // create firework projectile
