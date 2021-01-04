@@ -1,12 +1,15 @@
 use bevy::{prelude::*, render::pass::ClearColor};
+use rand::Rng;
+use std::time::Duration;
 
 fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
-        .add_resource(ClearColor(Color::rgba(0.1, 0.1, 0.1, 0.5)))
+        .add_resource(ClearColor(Color::rgb(0.1, 0.1, 0.1)))
         .add_startup_system(setup.system())
         .add_system(firework_propellant.system())
         .add_system(explode.system())
+        .add_system(launcher.system())
         .run();
 }
 
@@ -15,6 +18,13 @@ struct Firework {
 }
 struct Materials {
     mats: Vec<Handle<ColorMaterial>>,
+}
+
+struct FireworkTimer(Timer);
+impl Default for FireworkTimer {
+    fn default() -> Self {
+        Self(Timer::new(Duration::from_secs(1), true))
+    }
 }
 
 fn setup(
@@ -36,11 +46,6 @@ fn setup(
     commands
         .spawn(Camera2dBundle::default())
         .insert_resource(mat_vec);
-
-    // TODO: this needs to be in a rocket spawner.
-    let mat = materials.add(Color::RED.into());
-    let pos = Vec3::new(0.0, -200.0, 0.0);
-    blast_off(commands, mat, pos);
 }
 
 fn firework_propellant(time: Res<Time>, mut query: Query<(&Firework, &mut Transform)>) {
@@ -66,21 +71,41 @@ fn explode(commands: &mut Commands, materials: Res<Materials>, query: Query<(Ent
             let mat = materials.mats[0].clone_weak();
 
             // spawn an exploded firework
-            // TODO: for now just blast off from current position
-            blast_off(commands, mat, transform.translation);
+            // TODO: for now just create a large sprite at current position
+            // TODO: Should fade out after short timer
+            commands.spawn(SpriteBundle {
+                material: mat,
+                transform: Transform::from_translation(transform.translation),
+                sprite: Sprite::new(Vec2::new(100.0, 100.0)),
+                ..Default::default()
+            });
         }
     }
 }
 
-fn blast_off(commands: &mut Commands, mat: Handle<ColorMaterial>, pos: Vec3) {
-    commands
-        .spawn(SpriteBundle {
-            material: mat,
-            transform: Transform::from_translation(pos),
-            sprite: Sprite::new(Vec2::new(10.0, 10.0)),
-            ..Default::default()
-        })
-        .with(Firework {
-            velocity: 100.0 * Vec3::new(0.0, 0.5, 0.0).normalize(),
-        });
+fn launcher(
+    commands: &mut Commands,
+    materials: Res<Materials>,
+    time: Res<Time>,
+    mut timer: Local<FireworkTimer>,
+) {
+    if timer.0.tick(time.delta_seconds()).finished() {
+        // create firework projectile
+        // TODO: add random number of projectiles going to different spots in sky
+        commands
+            .spawn(SpriteBundle {
+                material: materials.mats[1].clone_weak(),
+                transform: Transform::from_translation(Vec3::new(0.0, -200.0, 0.0)),
+                sprite: Sprite::new(Vec2::new(5.0, 5.0)),
+                ..Default::default()
+            })
+            .with(Firework {
+                velocity: 100.0 * Vec3::new(0.0, 0.5, 0.0).normalize(),
+            });
+
+        // reset launch timer to new value
+        let mut rng = rand::thread_rng();
+        let rnd_time = rng.gen_range(2..6);
+        timer.0.set_duration(rnd_time as f32);
+    }
 }
