@@ -14,7 +14,9 @@ fn main() {
 }
 
 struct Firework {
-    velocity: Vec3,
+    start: Vec3,
+    target: Vec3,
+    time_in_flight: f32,
 }
 struct Materials {
     mats: Vec<Handle<ColorMaterial>>,
@@ -43,23 +45,34 @@ fn setup(
         .insert_resource(mat_vec);
 }
 
-fn firework_propellant(time: Res<Time>, mut query: Query<(&Firework, &mut Transform)>) {
+fn firework_propellant(time: Res<Time>, mut query: Query<(&mut Firework, &mut Transform)>) {
     let delta = f32::min(0.2, time.delta_seconds());
 
     // move the firework rocket
-    for (firework, mut transform) in query.iter_mut() {
-        transform.translation += firework.velocity * delta;
+    for (mut firework, mut transform) in query.iter_mut() {
+        firework.time_in_flight += delta;
+        //println!("time in flight: {}", firework.time_in_flight);
+
+        //transform.translation += firework.velocity * delta;
+        let step = firework.time_in_flight / 3.0;
+        let change = firework.start.lerp(firework.target, step);
+        transform.translation = change;
     }
 }
 
-fn explode(commands: &mut Commands, materials: Res<Materials>, query: Query<(Entity, &Transform)>) {
-    for (firework, transform) in query.iter() {
+fn explode(
+    commands: &mut Commands,
+    materials: Res<Materials>,
+    query: Query<(Entity, &Firework, &Transform)>,
+) {
+    for (entity, firework, transform) in query.iter() {
         // check if firework rocket reached desired hieght
         // TODO: should be random after certain height, or where mouse clicked
-        if transform.translation.y > 300.0 {
+        if firework.time_in_flight > 3.0 {
+            println!("DESPAWN");
             // save the current position
             // remove firework rocket
-            commands.despawn(firework);
+            commands.despawn(entity);
 
             // setup firework explosion
             // TODO: just a different color for now to debug
@@ -85,6 +98,11 @@ fn launcher(
     mut timer: ResMut<FireworkTimer>,
 ) {
     if timer.0.tick(time.delta_seconds()).finished() {
+        let mut rng = rand::thread_rng();
+        let t_x: f32 = rng.gen_range(-400.0..400.0);
+        let t_y: f32 = rng.gen_range(200.0..300.0);
+        let s_x: f32 = rng.gen_range(-50.0..50.0);
+
         // create firework projectile
         // TODO: add random number of projectiles going to different spots in sky
         commands
@@ -95,11 +113,12 @@ fn launcher(
                 ..Default::default()
             })
             .with(Firework {
-                velocity: 100.0 * Vec3::new(0.0, 0.5, 0.0).normalize(),
+                start: Vec3::new(s_x, -200.0, 0.0),
+                target: Vec3::new(t_x, t_y, 0.0),
+                time_in_flight: 0.0,
             });
 
         // reset launch timer to new value
-        let mut rng = rand::thread_rng();
         let rnd_time = rng.gen_range(2..6);
         timer.0.set_duration(rnd_time as f32);
     }
