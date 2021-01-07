@@ -11,6 +11,13 @@ struct Firework {
     target: Vec3,
     time_in_flight: f32,
 }
+
+struct Particle {
+    start: Vec3,
+    end: Vec3,
+    time: f32,
+}
+
 struct Materials {
     mats: Vec<Handle<ColorMaterial>>,
 }
@@ -36,6 +43,7 @@ fn main() {
         .add_system(explode.system())
         .add_system(launcher.system())
         .add_system(mouse_movement_detector.system())
+        .add_system(particle_update.system())
         .run();
 }
 
@@ -76,6 +84,16 @@ fn mouse_movement_detector(
     }
 }
 
+fn particle_update(time: Res<Time>, mut query: Query<(&mut Particle, &mut Transform)>) {
+    let delta = time.delta_seconds();
+    for (mut particle, mut transform) in query.iter_mut() {
+        particle.time += delta;
+        let step = particle.time / 1.0;
+        let change = particle.start.lerp(particle.end, step);
+        transform.translation = change;
+    }
+}
+
 fn firework_propellant(time: Res<Time>, mut query: Query<(&mut Firework, &mut Transform)>) {
     let delta = f32::min(0.2, time.delta_seconds());
 
@@ -111,15 +129,37 @@ fn explode(
             let mat = materials.mats[mat_index].clone_weak();
 
             // spawn an exploded firework
-            // TODO: for now just create a large sprite at current position
-            // TODO: Should fade out after short timer
-            commands.spawn(SpriteBundle {
+            boom(commands, mat, transform);
+        }
+    }
+}
+
+fn boom(commands: &mut Commands, material: Handle<ColorMaterial>, transform: &Transform) {
+    // TODO: for now just create a large sprite at current position
+    // TODO: Should fade out after short timer
+    let size = 4.0;
+    let num = 10;
+
+    for i in 0..num + 1 {
+        let mat = material.clone();
+        let t_x = (i as f64 * (36.0 as f64)).cos() as f32;
+        let t_y = (i as f64 * (36.0 as f64)).sin() as f32;
+
+        let t_x = t_x * 30.0 + transform.translation.x;
+        let t_y = t_y * 30.0 + transform.translation.y;
+
+        commands
+            .spawn(SpriteBundle {
                 material: mat,
                 transform: Transform::from_translation(transform.translation),
-                sprite: Sprite::new(Vec2::new(100.0, 100.0)),
+                sprite: Sprite::new(Vec2::new(size, size)),
                 ..Default::default()
+            })
+            .with(Particle {
+                start: transform.translation,
+                end: Vec3::new(t_x, t_y, 0.0),
+                time: 0.0,
             });
-        }
     }
 }
 
