@@ -1,4 +1,5 @@
 use bevy::{
+    ecs::Command,
     input::{mouse::MouseButtonInput, ElementState},
     prelude::*,
     render::pass::ClearColor,
@@ -13,8 +14,9 @@ struct Firework {
 }
 
 struct Particle {
-    start: Vec3,
-    end: Vec3,
+    pos: Vec3,
+    vel: Vec3,
+    acc: Vec3,
     time: f32,
 }
 
@@ -44,6 +46,7 @@ fn main() {
         .add_system(launcher.system())
         .add_system(mouse_movement_detector.system())
         .add_system(particle_update.system())
+        .add_system(particle_die_off.system())
         .run();
 }
 
@@ -88,9 +91,18 @@ fn particle_update(time: Res<Time>, mut query: Query<(&mut Particle, &mut Transf
     let delta = time.delta_seconds();
     for (mut particle, mut transform) in query.iter_mut() {
         particle.time += delta;
-        let step = particle.time / 1.0;
-        let change = particle.start.lerp(particle.end, step);
-        transform.translation = change;
+        particle.vel = particle.vel + particle.acc;
+        particle.pos = particle.pos + particle.vel;
+
+        transform.translation = particle.pos;
+    }
+}
+
+fn particle_die_off(commands: &mut Commands, query: Query<(Entity, &Particle)>) {
+    for (ent, part) in query.iter() {
+        if part.time > 2.0 {
+            commands.despawn(ent);
+        }
     }
 }
 
@@ -145,9 +157,6 @@ fn boom(commands: &mut Commands, material: Handle<ColorMaterial>, transform: &Tr
         let t_x = (i as f64 * (36.0 as f64)).cos() as f32;
         let t_y = (i as f64 * (36.0 as f64)).sin() as f32;
 
-        let t_x = t_x * 30.0 + transform.translation.x;
-        let t_y = t_y * 30.0 + transform.translation.y;
-
         commands
             .spawn(SpriteBundle {
                 material: mat,
@@ -156,8 +165,9 @@ fn boom(commands: &mut Commands, material: Handle<ColorMaterial>, transform: &Tr
                 ..Default::default()
             })
             .with(Particle {
-                start: transform.translation,
-                end: Vec3::new(t_x, t_y, 0.0),
+                pos: transform.translation,
+                vel: Vec3::new(t_x, t_y, 0.0),
+                acc: Vec3::new(0.0, 0.0, 0.0),
                 time: 0.0,
             });
     }
