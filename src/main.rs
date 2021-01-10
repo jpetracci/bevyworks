@@ -1,5 +1,4 @@
 use bevy::{
-    ecs::Command,
     input::{mouse::MouseButtonInput, ElementState},
     prelude::*,
     render::pass::ClearColor,
@@ -8,16 +7,25 @@ use bevy::{
 use rand::Rng;
 
 struct Firework {
-    start: Vec3,
-    target: Vec3,
-    time_in_flight: f32,
-}
-
-struct Particle {
     pos: Vec3,
     vel: Vec3,
     acc: Vec3,
     time: f32,
+}
+
+impl Firework {
+    fn add_force(&mut self, force: Vec3) {
+        self.acc += force;
+    }
+
+    fn update(&mut self, delta: f32) {
+        self.vel += self.acc * delta;
+        self.pos += self.vel;
+        self.time -= delta;
+
+        //zero out the acceleration as it has been applied to the velocity
+        self.acc = Vec3::zero();
+    }
 }
 
 struct Materials {
@@ -41,12 +49,10 @@ fn main() {
         .add_resource(ClearColor(Color::rgb(0.1, 0.1, 0.1)))
         .add_resource(MousePos(Vec2::new(0.0, 0.0)))
         .add_startup_system(setup.system())
-        .add_system(firework_propellant.system())
+        .add_system(firework_update.system())
         .add_system(explode.system())
         .add_system(launcher.system())
         .add_system(mouse_movement_detector.system())
-        .add_system(particle_update.system())
-        .add_system(particle_die_off.system())
         .run();
 }
 
@@ -87,37 +93,14 @@ fn mouse_movement_detector(
     }
 }
 
-fn particle_update(time: Res<Time>, mut query: Query<(&mut Particle, &mut Transform)>) {
-    let delta = time.delta_seconds();
-    for (mut particle, mut transform) in query.iter_mut() {
-        particle.time += delta;
-        particle.vel = particle.vel + particle.acc;
-        particle.pos = particle.pos + particle.vel;
-
-        transform.translation = particle.pos;
-    }
-}
-
-fn particle_die_off(commands: &mut Commands, query: Query<(Entity, &Particle)>) {
-    for (ent, part) in query.iter() {
-        if part.time > 2.0 {
-            commands.despawn(ent);
-        }
-    }
-}
-
-fn firework_propellant(time: Res<Time>, mut query: Query<(&mut Firework, &mut Transform)>) {
+fn firework_update(time: Res<Time>, mut query: Query<(&mut Firework, &mut Transform)>) {
     let delta = f32::min(0.2, time.delta_seconds());
 
-    // move the firework rocket
+    // update the firework
     for (mut firework, mut transform) in query.iter_mut() {
-        firework.time_in_flight += delta;
-        //println!("time in flight: {}", firework.time_in_flight);
-
-        //transform.translation += firework.velocity * delta;
-        let step = firework.time_in_flight / 3.0;
-        let change = firework.start.lerp(firework.target, step);
-        transform.translation = change;
+        firework.add_force(Vec3::zero());
+        firework.update(delta);
+        transform.translation = firework.pos;
     }
 }
 
@@ -129,10 +112,10 @@ fn explode(
     for (entity, firework, transform) in query.iter() {
         // check if firework rocket reached desired hieght
         // TODO: should be random after certain height, or where mouse clicked
-        if firework.time_in_flight > 3.0 {
+        if firework.time <= 0.0 {
             let mut rng = rand::thread_rng();
-            // save the current position
-            // remove firework rocket
+
+            // remove firework
             commands.despawn(entity);
 
             // setup firework explosion
@@ -149,28 +132,29 @@ fn explode(
 fn boom(commands: &mut Commands, material: Handle<ColorMaterial>, transform: &Transform) {
     // TODO: for now just create a large sprite at current position
     // TODO: Should fade out after short timer
-    let size = 4.0;
-    let num = 10;
+    // let size = 4.0;
+    // let num = 10;
 
-    for i in 0..num + 1 {
-        let mat = material.clone();
-        let t_x = (i as f64 * (36.0 as f64)).cos() as f32;
-        let t_y = (i as f64 * (36.0 as f64)).sin() as f32;
+    // for i in 0..num + 1 {
+    //     let mat = material.clone();
+    //     let t_x = (i as f64 * (36.0 as f64)).cos() as f32;
+    //     let t_y = (i as f64 * (36.0 as f64)).sin() as f32;
 
-        commands
-            .spawn(SpriteBundle {
-                material: mat,
-                transform: Transform::from_translation(transform.translation),
-                sprite: Sprite::new(Vec2::new(size, size)),
-                ..Default::default()
-            })
-            .with(Particle {
-                pos: transform.translation,
-                vel: Vec3::new(t_x, t_y, 0.0),
-                acc: Vec3::new(0.0, 0.0, 0.0),
-                time: 0.0,
-            });
-    }
+    //     commands
+    //         .spawn(SpriteBundle {
+    //             material: mat,
+    //             transform: Transform::from_translation(transform.translation),
+    //             sprite: Sprite::new(Vec2::new(size, size)),
+    //             ..Default::default()
+    //         })
+    //         .with(Particle {
+    //             pos: transform.translation,
+    //             vel: Vec3::new(t_x, t_y, 0.0),
+    //             acc: Vec3::new(0.0, 0.0, 0.0),
+    //             time: 0.0,
+    //         });
+    // }
+    println!("boom {}", transform.translation);
 }
 
 fn launcher(
@@ -183,29 +167,31 @@ fn launcher(
     mut timer: ResMut<FireworkTimer>,
 ) {
     // spawn from mouse click
-    for event in state.mouse_button_event_reader.iter(&mouse_button_events) {
-        if event.button == MouseButton::Left && event.state == ElementState::Released {
-            println!("{:?}", mouse_pos.0);
-            // TODO: duplicating code... really...
-            let mut rng = rand::thread_rng();
-            let t_x: f32 = mouse_pos.0.x;
-            let t_y: f32 = mouse_pos.0.y;
-            let s_x: f32 = rng.gen_range(-50.0..50.0);
+    // for event in state.mouse_button_event_reader.iter(&mouse_button_events) {
+    //     if event.button == MouseButton::Left && event.state == ElementState::Released {
+    //         println!("{:?}", mouse_pos.0);
 
-            commands
-                .spawn(SpriteBundle {
-                    material: materials.mats[1].clone_weak(),
-                    transform: Transform::from_translation(Vec3::new(0.0, -200.0, 0.0)),
-                    sprite: Sprite::new(Vec2::new(5.0, 5.0)),
-                    ..Default::default()
-                })
-                .with(Firework {
-                    start: Vec3::new(s_x, -200.0, 0.0),
-                    target: Vec3::new(t_x, t_y, 0.0),
-                    time_in_flight: 0.0,
-                });
-        }
-    }
+    //         // TODO: move to function
+    //         let mut rng = rand::thread_rng();
+    //         let t_x: f32 = mouse_pos.0.x;
+    //         let t_y: f32 = mouse_pos.0.y;
+    //         let s_x: f32 = rng.gen_range(-50.0..50.0);
+
+    //         commands
+    //             .spawn(SpriteBundle {
+    //                 material: materials.mats[1].clone_weak(),
+    //                 transform: Transform::from_translation(Vec3::new(0.0, -200.0, 0.0)),
+    //                 sprite: Sprite::new(Vec2::new(5.0, 5.0)),
+    //                 ..Default::default()
+    //             })
+    //             .with(Firework {
+    //                 pos: Vec3::new(s_x, -200.0, 0.0),
+    //                 vel: Vec3::new(1.0, 1.0, 0.0),
+    //                 acc: Vec3::zero(),
+    //                 time: 3.0,
+    //             });
+    //     }
+    // }
 
     // spawn randomly
     if timer.0.tick(time.delta_seconds()).finished() {
@@ -224,9 +210,10 @@ fn launcher(
                 ..Default::default()
             })
             .with(Firework {
-                start: Vec3::new(s_x, -200.0, 0.0),
-                target: Vec3::new(t_x, t_y, 0.0),
-                time_in_flight: 0.0,
+                pos: Vec3::new(s_x, -200.0, 0.0),
+                vel: Vec3::new(1.0, 1.0, 0.0),
+                acc: Vec3::zero(),
+                time: 3.0,
             });
 
         // reset launch timer to new value
