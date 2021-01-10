@@ -11,6 +11,7 @@ struct Firework {
     vel: Vec3,
     acc: Vec3,
     time: f32,
+    shell: bool,
 }
 
 impl Firework {
@@ -98,7 +99,8 @@ fn firework_update(time: Res<Time>, mut query: Query<(&mut Firework, &mut Transf
 
     // update the firework
     for (mut firework, mut transform) in query.iter_mut() {
-        firework.add_force(Vec3::zero());
+        // add some "gravity"
+        firework.add_force(Vec3::new(0.0, -0.05, 0.0));
         firework.update(delta);
         transform.translation = firework.pos;
     }
@@ -113,48 +115,48 @@ fn explode(
         // check if firework rocket reached desired hieght
         // TODO: should be random after certain height, or where mouse clicked
         if firework.time <= 0.0 {
-            let mut rng = rand::thread_rng();
-
             // remove firework
             commands.despawn(entity);
 
-            // setup firework explosion
-            // TODO: just a different color for now to debug
-            let mat_index = rng.gen_range(0..(materials.mats.len()));
-            let mat = materials.mats[mat_index].clone_weak();
-
-            // spawn an exploded firework
-            boom(commands, mat, transform);
+            // spawn an exploded firework if a shell
+            if firework.shell {
+                // setup firework explosion
+                // TODO: just a different color for now to debug
+                let mut rng = rand::thread_rng();
+                let mat_index = rng.gen_range(0..(materials.mats.len()));
+                let mat = materials.mats[mat_index].clone_weak();
+                boom(commands, mat, transform);
+            }
         }
     }
 }
 
 fn boom(commands: &mut Commands, material: Handle<ColorMaterial>, transform: &Transform) {
-    // TODO: for now just create a large sprite at current position
-    // TODO: Should fade out after short timer
-    // let size = 4.0;
-    // let num = 10;
+    //TODO: Should fade out over time
+    let size = 4.0;
+    let num = 50;
+    let mut rng = rand::thread_rng();
 
-    // for i in 0..num + 1 {
-    //     let mat = material.clone();
-    //     let t_x = (i as f64 * (36.0 as f64)).cos() as f32;
-    //     let t_y = (i as f64 * (36.0 as f64)).sin() as f32;
+    for i in 0..num + 1 {
+        let mat = material.clone();
+        let vx = rng.gen_range(-0.10..0.10);
+        let vy = rng.gen_range(-0.10..0.10);
 
-    //     commands
-    //         .spawn(SpriteBundle {
-    //             material: mat,
-    //             transform: Transform::from_translation(transform.translation),
-    //             sprite: Sprite::new(Vec2::new(size, size)),
-    //             ..Default::default()
-    //         })
-    //         .with(Particle {
-    //             pos: transform.translation,
-    //             vel: Vec3::new(t_x, t_y, 0.0),
-    //             acc: Vec3::new(0.0, 0.0, 0.0),
-    //             time: 0.0,
-    //         });
-    // }
-    println!("boom {}", transform.translation);
+        commands
+            .spawn(SpriteBundle {
+                material: mat,
+                transform: Transform::from_translation(transform.translation),
+                sprite: Sprite::new(Vec2::new(size, size)),
+                ..Default::default()
+            })
+            .with(Firework {
+                pos: transform.translation,
+                vel: Vec3::new(vx, vy, 0.0),
+                acc: Vec3::new(0.0, 0.0, 0.0),
+                time: 1.5,
+                shell: false,
+            });
+    }
 }
 
 fn launcher(
@@ -167,6 +169,7 @@ fn launcher(
     mut timer: ResMut<FireworkTimer>,
 ) {
     // spawn from mouse click
+    // TODO: Need to calc vel and time from mouse click (distance and direction)
     // for event in state.mouse_button_event_reader.iter(&mouse_button_events) {
     //     if event.button == MouseButton::Left && event.state == ElementState::Released {
     //         println!("{:?}", mouse_pos.0);
@@ -196,9 +199,9 @@ fn launcher(
     // spawn randomly
     if timer.0.tick(time.delta_seconds()).finished() {
         let mut rng = rand::thread_rng();
-        let t_x: f32 = rng.gen_range(-400.0..400.0);
-        let t_y: f32 = rng.gen_range(110.0..300.0);
-        let s_x: f32 = rng.gen_range(-50.0..50.0);
+        let vx: f32 = rng.gen_range(-0.15..0.15);
+        let vy: f32 = rng.gen_range(0.15..0.2);
+        let pos_x: f32 = rng.gen_range(-50.0..50.0);
 
         // create firework projectile
         // TODO: add random number of projectiles going to different spots in sky
@@ -210,14 +213,15 @@ fn launcher(
                 ..Default::default()
             })
             .with(Firework {
-                pos: Vec3::new(s_x, -200.0, 0.0),
-                vel: Vec3::new(1.0, 1.0, 0.0),
+                pos: Vec3::new(pos_x, -200.0, 0.0),
+                vel: Vec3::new(vx, vy, 0.0),
                 acc: Vec3::zero(),
-                time: 3.0,
+                time: 2.0,
+                shell: true,
             });
 
         // reset launch timer to new value
-        let rnd_time = rng.gen_range(1..3);
+        let rnd_time: f32 = rng.gen_range(0.0..0.5);
         timer.0.set_duration(rnd_time as f32);
     }
 }
