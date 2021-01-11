@@ -21,7 +21,7 @@ impl Firework {
 
     fn update(&mut self, delta: f32) {
         self.vel += self.acc * delta;
-        self.pos += self.vel;
+        self.pos += self.vel * delta;
         self.time -= delta;
 
         //zero out the acceleration as it has been applied to the velocity
@@ -69,6 +69,7 @@ fn setup(
             materials.add(Color::RED.into()),
             materials.add(Color::BLUE.into()),
             materials.add(Color::YELLOW.into()),
+            materials.add(Color::DARK_GRAY.into()),
         ],
     };
 
@@ -100,7 +101,7 @@ fn firework_update(time: Res<Time>, mut query: Query<(&mut Firework, &mut Transf
     // update the firework
     for (mut firework, mut transform) in query.iter_mut() {
         // add some "gravity"
-        firework.add_force(Vec3::new(0.0, -0.05, 0.0));
+        firework.add_force(Vec3::new(0.0, -0.50, 0.0));
         firework.update(delta);
         transform.translation = firework.pos;
     }
@@ -123,7 +124,7 @@ fn explode(
                 // setup firework explosion
                 // TODO: just a different color for now to debug
                 let mut rng = rand::thread_rng();
-                let mat_index = rng.gen_range(0..(materials.mats.len()));
+                let mat_index = rng.gen_range(0..(materials.mats.len() - 1));
                 let mat = materials.mats[mat_index].clone_weak();
                 boom(commands, mat, transform);
             }
@@ -139,8 +140,9 @@ fn boom(commands: &mut Commands, material: Handle<ColorMaterial>, transform: &Tr
 
     for i in 0..num + 1 {
         let mat = material.clone();
-        let vx = rng.gen_range(-0.10..0.10);
-        let vy = rng.gen_range(-0.10..0.10);
+        let radius = rng.gen_range(10.0..200.0);
+        let vx: f32 = rng.gen_range(-radius..radius) * ((i * (360 / num)) as f32).cos();
+        let vy: f32 = rng.gen_range(-radius..radius) * ((i * (360 / num)) as f32).sin();
 
         commands
             .spawn(SpriteBundle {
@@ -153,7 +155,7 @@ fn boom(commands: &mut Commands, material: Handle<ColorMaterial>, transform: &Tr
                 pos: transform.translation,
                 vel: Vec3::new(vx, vy, 0.0),
                 acc: Vec3::new(0.0, 0.0, 0.0),
-                time: 1.5,
+                time: 1.0,
                 shell: false,
             });
     }
@@ -199,16 +201,16 @@ fn launcher(
     // spawn randomly
     if timer.0.tick(time.delta_seconds()).finished() {
         let mut rng = rand::thread_rng();
-        let vx: f32 = rng.gen_range(-0.15..0.15);
-        let vy: f32 = rng.gen_range(0.15..0.2);
+        let vx: f32 = rng.gen_range(-200.0..200.0);
+        let vy: f32 = rng.gen_range(150.0..200.0);
         let pos_x: f32 = rng.gen_range(-50.0..50.0);
 
         // create firework projectile
         // TODO: add random number of projectiles going to different spots in sky
         commands
             .spawn(SpriteBundle {
-                material: materials.mats[1].clone_weak(),
-                transform: Transform::from_translation(Vec3::new(0.0, -200.0, 0.0)),
+                material: materials.mats[4].clone_weak(),
+                transform: Transform::from_translation(Vec3::new(pos_x, -200.0, 0.0)),
                 sprite: Sprite::new(Vec2::new(5.0, 5.0)),
                 ..Default::default()
             })
