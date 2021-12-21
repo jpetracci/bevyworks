@@ -1,9 +1,4 @@
-use bevy::{
-    input::{mouse::MouseButtonInput, ElementState},
-    prelude::*,
-    render::pass::ClearColor,
-    window::CursorMoved,
-};
+use bevy::{prelude::*, render::pass::ClearColor, window::CursorMoved};
 use rand::Rng;
 
 struct Firework {
@@ -39,7 +34,7 @@ struct MousePos(Vec2);
 
 #[derive(Default)]
 struct State {
-    mouse_button_event_reader: EventReader<MouseButtonInput>,
+    //mouse_button_event_reader: EventReader<MouseButtonInput>,
     cursor_moved_event_reader: EventReader<CursorMoved>,
 }
 
@@ -101,7 +96,7 @@ fn firework_update(time: Res<Time>, mut query: Query<(&mut Firework, &mut Transf
     // update the firework
     for (mut firework, mut transform) in query.iter_mut() {
         // add some "gravity"
-        firework.add_force(Vec3::new(0.0, -0.50, 0.0));
+        firework.add_force(Vec3::new(0.0, -100.0, 0.0));
         firework.update(delta);
         transform.translation = firework.pos;
     }
@@ -140,9 +135,9 @@ fn boom(commands: &mut Commands, material: Handle<ColorMaterial>, transform: &Tr
 
     for i in 0..num + 1 {
         let mat = material.clone();
-        let radius = rng.gen_range(10.0..200.0);
-        let vx: f32 = rng.gen_range(-radius..radius) * ((i * (360 / num)) as f32).cos();
-        let vy: f32 = rng.gen_range(-radius..radius) * ((i * (360 / num)) as f32).sin();
+        let radius = rng.gen_range(25.0..100.0);
+        let vx: f32 = radius * ((i * (360 / num)) as f32).cos();
+        let vy: f32 = radius * ((i * (360 / num)) as f32).sin();
 
         commands
             .spawn(SpriteBundle {
@@ -165,9 +160,9 @@ fn launcher(
     commands: &mut Commands,
     materials: Res<Materials>,
     time: Res<Time>,
-    mut state: Local<State>,
-    mouse_pos: Res<MousePos>,
-    mouse_button_events: Res<Events<MouseButtonInput>>,
+    //mut state: Local<State>,
+    //mouse_pos: Res<MousePos>,
+    //mouse_button_events: Res<Events<MouseButtonInput>>,
     mut timer: ResMut<FireworkTimer>,
 ) {
     // spawn from mouse click
@@ -201,8 +196,8 @@ fn launcher(
     // spawn randomly
     if timer.0.tick(time.delta_seconds()).finished() {
         let mut rng = rand::thread_rng();
-        let vx: f32 = rng.gen_range(-200.0..200.0);
-        let vy: f32 = rng.gen_range(150.0..200.0);
+        let vx: f32 = rng.gen_range(-150.0..150.0);
+        let vy: f32 = rng.gen_range(250.0..325.0);
         let pos_x: f32 = rng.gen_range(-50.0..50.0);
 
         // create firework projectile
