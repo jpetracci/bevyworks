@@ -2,7 +2,7 @@
 name = "bevyworks"
 version = "0.1.0"
 authors = ["Joel Petracci <jpetracci@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 bevy = "0.7"

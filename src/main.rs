@@ -1,6 +1,7 @@
 use bevy::{prelude::*, render::pass::ClearColor, window::CursorMoved};
 use rand::Rng;
 
+#[derive(Component)]
 struct Firework {
     pos: Vec3,
     vel: Vec3,
@@ -24,31 +25,34 @@ impl Firework {
     }
 }
 
+#[derive(Component)]
 struct Materials {
     mats: Vec<Handle<ColorMaterial>>,
 }
 
+#[derive(Component)]
 struct FireworkTimer(Timer);
 
+#[derive(Component)]
 struct MousePos(Vec2);
 
-#[derive(Default)]
+#[derive(Component)]
 struct State {
     //mouse_button_event_reader: EventReader<MouseButtonInput>,
     cursor_moved_event_reader: EventReader<CursorMoved>,
 }
 
 fn main() {
-    App::build()
+    App::new()
         .add_plugins(DefaultPlugins)
-        .add_resource(FireworkTimer(Timer::from_seconds(1.0, true)))
-        .add_resource(ClearColor(Color::rgb(0.1, 0.1, 0.1)))
-        .add_resource(MousePos(Vec2::new(0.0, 0.0)))
-        .add_startup_system(setup.system())
-        .add_system(firework_update.system())
-        .add_system(explode.system())
-        .add_system(launcher.system())
-        .add_system(mouse_movement_detector.system())
+        .insert_resource(FireworkTimer(Timer::from_seconds(1.0, true)))
+        .insert_resource(ClearColor(Color::rgb(0.1, 0.1, 0.1)))
+        .insert_resource(MousePos(Vec2::new(0.0, 0.0)))
+        .add_startup_system(setup)
+        .add_system(firework_update)
+        .add_system(explode)
+        .add_system(launcher)
+        .add_system(mouse_movement_detector)
         .run();
 }
 
@@ -70,18 +74,13 @@ fn setup(
 
     // setup the generic components
     commands
-        .spawn(Camera2dBundle::default())
+        .spawn_bundle(Camera2dBundle::default())
         .insert_resource(mat_vec);
 }
 
 // need to save the mouse position manually
-fn mouse_movement_detector(
-    mut mouse_pos: ResMut<MousePos>,
-    mut state: Local<State>,
-    windows: Res<Windows>,
-    cursor_events: Res<Events<CursorMoved>>,
-) {
-    for event in state.cursor_moved_event_reader.iter(&cursor_events) {
+fn mouse_movement_detector(mut mouse_motion_events: EventReader<MouseMotion>) {
+    for event in mouse_motion_evnets.iter() {
         let window = windows.get(event.id).unwrap();
         // game coords are 0 0 in middle of window
         // mouse coords are 0 0 in bottom left of winodw
@@ -140,8 +139,7 @@ fn boom(commands: &mut Commands, material: Handle<ColorMaterial>, transform: &Tr
         let vy: f32 = radius * ((i * (360 / num)) as f32).sin();
 
         commands
-            .spawn(SpriteBundle {
-                material: mat,
+            .spawn_bundle(SpriteBundle {
                 transform: Transform::from_translation(transform.translation),
                 sprite: Sprite::new(Vec2::new(size, size)),
                 ..Default::default()
@@ -203,8 +201,7 @@ fn launcher(
         // create firework projectile
         // TODO: add random number of projectiles going to different spots in sky
         commands
-            .spawn(SpriteBundle {
-                material: materials.mats[4].clone_weak(),
+            .spawn_bundle(SpriteBundle {
                 transform: Transform::from_translation(Vec3::new(pos_x, -200.0, 0.0)),
                 sprite: Sprite::new(Vec2::new(5.0, 5.0)),
                 ..Default::default()
